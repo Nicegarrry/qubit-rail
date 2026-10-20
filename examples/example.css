@@ -1,0 +1,6 @@
+@import "../src/rail.css";
+body { margin: 0; background: #faf9f5; color: #17283a; font: 16px/1.5 system-ui, sans-serif; }
+.example { min-height: 100vh; padding: 72px max(24px, calc((100vw - 960px) / 2)); }
+.example section { max-width: 580px; }
+.example h1 { font-size: 34px; font-weight: 600; }
+.rail-shell { position: fixed; top: 0; right: 0; bottom: 0; }
