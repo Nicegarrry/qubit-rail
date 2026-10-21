@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { forwardRef, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { MarkdownRenderer, RailMessage, RailThread } from "./types";
 
 const urlPattern = /(https?:\/\/[^\s<>"']+)/g;
@@ -34,42 +34,77 @@ export function ThreadList({ threads, selectedId, busy = false, onChoose, emptyL
 export function MessageList({ messages, busy = false, onSend, onThumbUp, renderMarkdown, emptyLabel = "No messages yet." }: {
   messages: RailMessage[]; busy?: boolean; onSend?: (text: string) => void; onThumbUp?: (id: string) => void; renderMarkdown?: MarkdownRenderer; emptyLabel?: string;
 }) {
+  const list = useRef<HTMLDivElement>(null);
+  const stickToBottom = useRef(true);
+  useLayoutEffect(() => {
+    const element = list.current;
+    if (element && stickToBottom.current) element.scrollTop = element.scrollHeight;
+  }, [messages]);
+
   if (!messages.length) return <p className="rail-status">{emptyLabel}</p>;
-  return <div className="rail-messages" aria-live="polite">{messages.map(message => (
+  return <div ref={list} className="rail-messages" aria-live="polite" onScroll={() => {
+    const element = list.current;
+    if (element) stickToBottom.current = element.scrollTop + element.clientHeight >= element.scrollHeight - 1;
+  }}>{messages.map(message => (
     <article className={`rail-message rail-${message.role}`} key={message.id}>
       {message.quote && <blockquote className="rail-quote">{message.quote}</blockquote>}
       {message.role === "agent" && message.authorName && <strong className="rail-author">{message.authorName}</strong>}
       <div className={message.role === "agent" ? "rail-markdown" : "rail-plain"}>{message.role === "agent" && renderMarkdown ? renderMarkdown(message.text) : <LinkedText text={message.text} />}</div>
-      {message.role === "agent" && message.buttons?.length ? <div className="rail-chips">{message.buttons.map(label => <button type="button" key={label} disabled={busy} onClick={() => onSend?.(label)}>{label}</button>)}</div> : null}
+      {message.role === "agent" && message.buttons?.length ? <div className="rail-chips">{message.buttons.map((button, index) => {
+        const label = typeof button === "string" ? button : button.label;
+        const used = typeof button === "string" ? false : button.used;
+        return <button type="button" key={`${label}-${index}`} data-used={used || undefined} disabled={busy || used} onClick={() => onSend?.(label)}>{label}</button>;
+      })}</div> : null}
       {message.canThumbUp && <button type="button" className="rail-thumb" disabled={busy} aria-pressed={message.thumbedUp} aria-label="Helpful response" onClick={() => onThumbUp?.(message.id)}>👍</button>}
       {message.receipt && <span className="rail-receipt">{message.receipt === "seen" ? "Seen" : "Sent"}</span>}
     </article>
   ))}</div>;
 }
 
-export function Composer({ onSend, quote, onClearQuote, sending = false, disabled = false, error, placeholder = "Message the agent" }: {
-  onSend: (text: string) => void | Promise<void>; quote?: string; onClearQuote?: () => void; sending?: boolean; disabled?: boolean; error?: string; placeholder?: string;
-}) {
+export type ComposerHandle = { focus: () => void };
+
+export type ComposerProps = {
+  onSend: (text: string) => void | Promise<void>;
+  quote?: string;
+  onClearQuote?: () => void;
+  sending?: boolean;
+  disabled?: boolean;
+  error?: string;
+  placeholder?: string;
+  maxLength?: number;
+};
+
+export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer({ onSend, quote, onClearQuote, sending = false, disabled = false, error, placeholder = "Message the agent", maxLength = 20_000 }, ref) {
   const [text, setText] = useState("");
-  const blocked = disabled || sending;
-  const submit = (event?: FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  const blocked = disabled || sending || submitting;
+  useImperativeHandle(ref, () => ({ focus: () => textarea.current?.focus() }), []);
+  const submit = async (event?: FormEvent) => {
     event?.preventDefault();
     const value = text.trim();
     if (!value || blocked) return;
-    onSend(value);
-    setText("");
+    setSubmitting(true);
+    try {
+      await onSend(value);
+      setText("");
+    } catch {
+      // The host owns error presentation; retain text so the person can retry.
+    } finally {
+      setSubmitting(false);
+    }
   };
   return <form className="rail-composer" onSubmit={submit}>
     {quote && <div className="rail-quote-row"><blockquote className="rail-quote">{quote}</blockquote>{onClearQuote && <button type="button" className="rail-icon" aria-label="Remove quote" disabled={blocked} onClick={onClearQuote}>×</button>}</div>}
-    <textarea aria-label={placeholder} placeholder={placeholder} rows={3} value={text} disabled={blocked} onChange={event => setText(event.target.value)}
-      onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); } }} />
-    <div className="rail-composer-end"><span>{sending ? "Sending…" : "Enter to send · Shift+Enter for a new line"}</span><button type="submit" disabled={blocked || !text.trim()}>{sending ? "Sending…" : "Send"}</button></div>
+    <textarea ref={textarea} aria-label={placeholder} placeholder={placeholder} rows={3} maxLength={maxLength} value={text} disabled={blocked} onChange={event => setText(event.target.value)}
+      onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void submit(); } }} />
+    <div className="rail-composer-end"><span>{sending || submitting ? "Sending…" : "Enter to send · Shift+Enter for a new line"}</span><button type="submit" disabled={blocked || !text.trim()}>{sending || submitting ? "Sending…" : "Send"}</button></div>
     {error && <p className="rail-error" role="alert">{error}</p>}
   </form>;
-}
+});
 
-export function RailHeader({ title, subtitle, onClose }: { title: string; subtitle?: string; onClose?: () => void }) {
-  return <header className="rail-header"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{onClose && <button type="button" className="rail-icon rail-close" aria-label="Close chat" onClick={onClose}>×</button>}</header>;
+export function RailHeader({ title, subtitle, onClose, closeOnDesktop = false }: { title: string; subtitle?: string; onClose?: () => void; closeOnDesktop?: boolean }) {
+  return <header className="rail-header" data-close-on-desktop={closeOnDesktop || undefined}><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{onClose && <button type="button" className="rail-icon rail-close" aria-label="Close chat" onClick={onClose}>×</button>}</header>;
 }
 
 export function ThreadSwitcher({ title = "Chats", onBack, onNew, busy = false }: { title?: string; onBack?: () => void; onNew?: () => void; busy?: boolean }) {

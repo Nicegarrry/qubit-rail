@@ -71,25 +71,47 @@ function ThreadList({ threads, selectedId, busy = false, onChoose, emptyLabel = 
   )) });
 }
 function MessageList({ messages, busy = false, onSend, onThumbUp, renderMarkdown, emptyLabel = "No messages yet." }) {
+  const list = (0, import_react.useRef)(null);
+  const stickToBottom = (0, import_react.useRef)(true);
+  (0, import_react.useLayoutEffect)(() => {
+    const element = list.current;
+    if (element && stickToBottom.current) element.scrollTop = element.scrollHeight;
+  }, [messages]);
   if (!messages.length) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rail-status", children: emptyLabel });
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rail-messages", "aria-live": "polite", children: messages.map((message) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: `rail-message rail-${message.role}`, children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { ref: list, className: "rail-messages", "aria-live": "polite", onScroll: () => {
+    const element = list.current;
+    if (element) stickToBottom.current = element.scrollTop + element.clientHeight >= element.scrollHeight - 1;
+  }, children: messages.map((message) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", { className: `rail-message rail-${message.role}`, children: [
     message.quote && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("blockquote", { className: "rail-quote", children: message.quote }),
     message.role === "agent" && message.authorName && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", { className: "rail-author", children: message.authorName }),
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: message.role === "agent" ? "rail-markdown" : "rail-plain", children: message.role === "agent" && renderMarkdown ? renderMarkdown(message.text) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LinkedText, { text: message.text }) }),
-    message.role === "agent" && message.buttons?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rail-chips", children: message.buttons.map((label) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", disabled: busy, onClick: () => onSend?.(label), children: label }, label)) }) : null,
+    message.role === "agent" && message.buttons?.length ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "rail-chips", children: message.buttons.map((button, index) => {
+      const label = typeof button === "string" ? button : button.label;
+      const used = typeof button === "string" ? false : button.used;
+      return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", "data-used": used || void 0, disabled: busy || used, onClick: () => onSend?.(label), children: label }, `${label}-${index}`);
+    }) }) : null,
     message.canThumbUp && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "rail-thumb", disabled: busy, "aria-pressed": message.thumbedUp, "aria-label": "Helpful response", onClick: () => onThumbUp?.(message.id), children: "\u{1F44D}" }),
     message.receipt && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "rail-receipt", children: message.receipt === "seen" ? "Seen" : "Sent" })
   ] }, message.id)) });
 }
-function Composer({ onSend, quote, onClearQuote, sending = false, disabled = false, error, placeholder = "Message the agent" }) {
+var Composer = (0, import_react.forwardRef)(function Composer2({ onSend, quote, onClearQuote, sending = false, disabled = false, error, placeholder = "Message the agent", maxLength = 2e4 }, ref) {
   const [text, setText] = (0, import_react.useState)("");
-  const blocked = disabled || sending;
-  const submit = (event) => {
+  const [submitting, setSubmitting] = (0, import_react.useState)(false);
+  const textarea = (0, import_react.useRef)(null);
+  const blocked = disabled || sending || submitting;
+  (0, import_react.useImperativeHandle)(ref, () => ({ focus: () => textarea.current?.focus() }), []);
+  const submit = async (event) => {
     event?.preventDefault();
     const value = text.trim();
     if (!value || blocked) return;
-    onSend(value);
-    setText("");
+    setSubmitting(true);
+    try {
+      await onSend(value);
+      setText("");
+    } catch {
+    } finally {
+      setSubmitting(false);
+    }
   };
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", { className: "rail-composer", onSubmit: submit, children: [
     quote && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rail-quote-row", children: [
@@ -99,29 +121,31 @@ function Composer({ onSend, quote, onClearQuote, sending = false, disabled = fal
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
       "textarea",
       {
+        ref: textarea,
         "aria-label": placeholder,
         placeholder,
         rows: 3,
+        maxLength,
         value: text,
         disabled: blocked,
         onChange: (event) => setText(event.target.value),
         onKeyDown: (event) => {
           if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
-            submit();
+            void submit();
           }
         }
       }
     ),
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rail-composer-end", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: sending ? "Sending\u2026" : "Enter to send \xB7 Shift+Enter for a new line" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "submit", disabled: blocked || !text.trim(), children: sending ? "Sending\u2026" : "Send" })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: sending || submitting ? "Sending\u2026" : "Enter to send \xB7 Shift+Enter for a new line" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "submit", disabled: blocked || !text.trim(), children: sending || submitting ? "Sending\u2026" : "Send" })
     ] }),
     error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "rail-error", role: "alert", children: error })
   ] });
-}
-function RailHeader({ title, subtitle, onClose }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "rail-header", children: [
+});
+function RailHeader({ title, subtitle, onClose, closeOnDesktop = false }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { className: "rail-header", "data-close-on-desktop": closeOnDesktop || void 0, children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: title }),
       subtitle && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: subtitle })

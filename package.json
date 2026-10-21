@@ -1,6 +1,6 @@
 {
   "name": "@qubit/rail",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Presentational React chat rail for qWork and qubit-site",
   "license": "MIT",
   "sideEffects": ["./dist/index.css"],

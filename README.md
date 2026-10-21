@@ -21,3 +21,10 @@ Set the `--rail-*` variables on `.rail-shell` (for example `--rail-bg` and
 and a focus-trapped, Escape-closeable bottom sheet at its configurable 1024px
 breakpoint. The committed `dist/` build makes git-dependency installs reliable
 without relying on consumers to run lifecycle scripts.
+
+`RailHeader` renders no close control without `onClose`. With `onClose`, the
+control is shown on the mobile sheet; pass `closeOnDesktop` to show it in the
+desktop rail too. `Composer` accepts a ref with `focus()` for returning focus
+after a host handles a quick reply or Ask action, and defaults to a 20,000
+character `maxLength`. Quick replies can be strings or `{ label, used }`;
+used replies remain visible but are disabled and greyed out.

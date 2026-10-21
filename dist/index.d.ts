@@ -14,10 +14,15 @@ type RailMessage = {
     text: string;
     authorName?: string;
     quote?: string;
-    buttons?: string[];
+    buttons?: RailQuickReply[];
     receipt?: "sent" | "seen";
     canThumbUp?: boolean;
     thumbedUp?: boolean;
+};
+/** A quick reply may be kept visible after use so its conversational context remains clear. */
+type RailQuickReply = string | {
+    label: string;
+    used?: boolean;
 };
 type MarkdownRenderer = (text: string) => ReactNode;
 
@@ -39,7 +44,10 @@ declare function MessageList({ messages, busy, onSend, onThumbUp, renderMarkdown
     renderMarkdown?: MarkdownRenderer;
     emptyLabel?: string;
 }): react.JSX.Element;
-declare function Composer({ onSend, quote, onClearQuote, sending, disabled, error, placeholder }: {
+type ComposerHandle = {
+    focus: () => void;
+};
+type ComposerProps = {
     onSend: (text: string) => void | Promise<void>;
     quote?: string;
     onClearQuote?: () => void;
@@ -47,11 +55,14 @@ declare function Composer({ onSend, quote, onClearQuote, sending, disabled, erro
     disabled?: boolean;
     error?: string;
     placeholder?: string;
-}): react.JSX.Element;
-declare function RailHeader({ title, subtitle, onClose }: {
+    maxLength?: number;
+};
+declare const Composer: react.ForwardRefExoticComponent<ComposerProps & react.RefAttributes<ComposerHandle>>;
+declare function RailHeader({ title, subtitle, onClose, closeOnDesktop }: {
     title: string;
     subtitle?: string;
     onClose?: () => void;
+    closeOnDesktop?: boolean;
 }): react.JSX.Element;
 declare function ThreadSwitcher({ title, onBack, onNew, busy }: {
     title?: string;
@@ -71,4 +82,4 @@ declare function RailShell({ children, label, open, onOpenChange, triggerLabel, 
     breakpoint?: number;
 }): react.JSX.Element;
 
-export { AwayNotice, Composer, type MarkdownRenderer, MessageList, RailHeader, type RailMessage, RailShell, type RailThread, ThreadList, ThreadSwitcher, UnreadBadge };
+export { AwayNotice, Composer, type ComposerHandle, type ComposerProps, type MarkdownRenderer, MessageList, RailHeader, type RailMessage, type RailQuickReply, RailShell, type RailThread, ThreadList, ThreadSwitcher, UnreadBadge };
