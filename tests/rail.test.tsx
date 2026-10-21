@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
-import { AwayNotice, Composer, MessageList, RailHeader, RailShell, ThreadList, ThreadSwitcher, UnreadBadge } from "../src";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createRef, useState } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { AwayNotice, Composer, type ComposerHandle, MessageList, RailHeader, RailShell, ThreadList, ThreadSwitcher, UnreadBadge } from "../src";
+
+afterEach(cleanup);
 
 describe("rail components", () => {
   it("chooses a thread and shows unread state", () => {
@@ -16,23 +18,26 @@ describe("rail components", () => {
   it("renders messages, injected markdown, links, chips and receipts", () => {
     const send = vi.fn(); const thumb = vi.fn();
     render(<MessageList onSend={send} onThumbUp={thumb} renderMarkdown={text => <em>markdown: {text}</em>} messages={[
-      { id: "a", role: "agent", text: "Hello", authorName: "qOS", quote: "Source", buttons: ["Continue"], canThumbUp: true, receipt: "seen" },
+      { id: "a", role: "agent", text: "Hello", authorName: "qOS", quote: "Source", buttons: [{ label: "Previously asked", used: true }, "Continue"], canThumbUp: true, receipt: "seen" },
       { id: "p", role: "person", text: "See https://example.com", receipt: "sent" },
     ]} />);
     expect(screen.getByText("markdown: Hello")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "https://example.com" })).toHaveAttribute("href", "https://example.com");
+    expect(screen.getByRole("button", { name: "Previously asked" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Previously asked" })).toHaveAttribute("data-used");
     fireEvent.click(screen.getByRole("button", { name: "Continue" })); fireEvent.click(screen.getByRole("button", { name: "Helpful response" }));
     expect(send).toHaveBeenCalledWith("Continue"); expect(thumb).toHaveBeenCalledWith("a"); expect(screen.getByText("Seen")).toBeInTheDocument();
     render(<MessageList busy onSend={send} messages={[{ id: "busy", role: "agent", text: "Busy", buttons: ["Wait"] }]} />);
     expect(screen.getByRole("button", { name: "Wait" })).toBeDisabled();
   });
 
-  it("sends on Enter, keeps a newline on Shift+Enter, and respects busy state", () => {
+  it("sends on Enter, keeps a newline on Shift+Enter, and respects busy state", async () => {
     const send = vi.fn(); const clear = vi.fn();
     const { rerender } = render(<Composer onSend={send} quote="Quoted" onClearQuote={clear} />);
     const box = screen.getByRole("textbox");
     fireEvent.change(box, { target: { value: "Hello" } }); fireEvent.keyDown(box, { key: "Enter" });
     expect(send).toHaveBeenCalledWith("Hello");
+    await waitFor(() => expect(box).not.toBeDisabled());
     fireEvent.change(box, { target: { value: "one" } }); fireEvent.keyDown(box, { key: "Enter", shiftKey: true });
     expect(send).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Remove quote" })); expect(clear).toHaveBeenCalled();
@@ -40,11 +45,64 @@ describe("rail components", () => {
     expect(screen.getByRole("textbox")).toBeDisabled(); expect(screen.getByRole("alert")).toHaveTextContent("No connection");
   });
 
+  it("awaits sends before clearing, keeps rejected text, supports limits and exposes focus", async () => {
+    let resolve!: () => void;
+    let reject!: (reason?: unknown) => void;
+    const send = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>(done => { resolve = done; }))
+      .mockImplementationOnce(() => new Promise<void>((_, fail) => { reject = fail; }));
+    const ref = createRef<ComposerHandle>();
+    render(<Composer ref={ref} onSend={send} maxLength={3} />);
+    const box = screen.getByRole("textbox");
+    expect(box).toHaveAttribute("maxlength", "3");
+    ref.current?.focus(); expect(document.activeElement).toBe(box);
+    fireEvent.change(box, { target: { value: "one" } }); fireEvent.submit(box.closest("form")!);
+    expect(box).toHaveValue("one");
+    resolve();
+    await waitFor(() => expect(box).toHaveValue(""));
+    fireEvent.change(box, { target: { value: "two" } }); fireEvent.submit(box.closest("form")!);
+    reject(new Error("offline"));
+    await waitFor(() => expect(box).toHaveValue("two"));
+  });
+
+  it("scrolls new and opened message lists to the bottom only while the reader is there", () => {
+    const message = (id: string) => ({ id, role: "agent" as const, text: id });
+    const { container, rerender } = render(<MessageList messages={[message("one")]} />);
+    const list = container.querySelector<HTMLDivElement>(".rail-messages")!;
+    Object.defineProperties(list, {
+      clientHeight: { configurable: true, value: 100 },
+      scrollHeight: { configurable: true, value: 1000 },
+    });
+    rerender(<MessageList messages={[message("one"), message("two")]} />);
+    expect(list.scrollTop).toBe(1000);
+    list.scrollTop = 200; fireEvent.scroll(list);
+    rerender(<MessageList messages={[message("one"), message("two"), message("three")]} />);
+    expect(list.scrollTop).toBe(200);
+    list.scrollTop = 900; fireEvent.scroll(list);
+    rerender(<MessageList messages={[message("one"), message("two"), message("three"), message("four")]} />);
+    expect(list.scrollTop).toBe(1000);
+  });
+
+  it("keeps untrusted markdown text inert while linking only safe URLs", () => {
+    const { container } = render(<MessageList messages={[{ id: "unsafe", role: "agent", text: '<a href="javascript:alert(1)">unsafe</a> https://example.com' }]} />);
+    expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
+    expect(container.textContent).toContain('<a href="javascript:alert(1)">unsafe</a>');
+    expect(screen.getByRole("link", { name: "https://example.com" })).toHaveAttribute("href", "https://example.com");
+  });
+
   it("renders the header, switcher and away notice callbacks", () => {
     const close = vi.fn(), back = vi.fn(), next = vi.fn();
     render(<><RailHeader title="Page chat" subtitle="A page" onClose={close} /><ThreadSwitcher title="Thread" onBack={back} onNew={next} /><AwayNotice>Waiting</AwayNotice></>);
     fireEvent.click(screen.getByRole("button", { name: "Close chat" })); fireEvent.click(screen.getByRole("button", { name: "Back to threads" })); fireEvent.click(screen.getByRole("button", { name: "New" }));
     expect(close).toHaveBeenCalledOnce(); expect(back).toHaveBeenCalledOnce(); expect(next).toHaveBeenCalledOnce(); expect(screen.getByRole("status")).toHaveTextContent("Waiting");
+  });
+
+  it("renders a close control only when supplied and marks the desktop option", () => {
+    const { rerender } = render(<RailHeader title="No close" />);
+    expect(screen.queryByRole("button", { name: "Close chat" })).not.toBeInTheDocument();
+    rerender(<RailHeader title="Close" onClose={() => undefined} closeOnDesktop />);
+    expect(screen.getByRole("button", { name: "Close chat" })).toBeInTheDocument();
+    expect(screen.getByRole("banner")).toHaveAttribute("data-close-on-desktop");
   });
 
   it("traps sheet focus and closes on Escape", () => {
