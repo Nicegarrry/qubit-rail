@@ -1,0 +1,8 @@
+{
+  "gates": [
+    { "name": "install", "command": "pnpm install --frozen-lockfile" },
+    { "name": "typecheck", "command": "pnpm typecheck" },
+    { "name": "test", "command": "pnpm test" },
+    { "name": "build", "command": "pnpm build" }
+  ]
+}
