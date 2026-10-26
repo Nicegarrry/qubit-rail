@@ -40,9 +40,25 @@ describe("rail components", () => {
     await waitFor(() => expect(box).not.toBeDisabled());
     fireEvent.change(box, { target: { value: "one" } }); fireEvent.keyDown(box, { key: "Enter", shiftKey: true });
     expect(send).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(box, { key: "Enter", isComposing: true });
+    expect(send).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Remove quote" })); expect(clear).toHaveBeenCalled();
     rerender(<Composer onSend={send} sending error="No connection" />);
     expect(screen.getByRole("textbox")).toBeDisabled(); expect(screen.getByRole("alert")).toHaveTextContent("No connection");
+  });
+
+  it("blurs on Escape without changing the draft or quote", () => {
+    const send = vi.fn(); const clear = vi.fn();
+    render(<Composer onSend={send} quote="Quoted" onClearQuote={clear} />);
+    const box = screen.getByRole("textbox");
+    box.focus();
+    fireEvent.change(box, { target: { value: "Draft" } });
+    expect(box).toHaveFocus();
+    expect(fireEvent.keyDown(box, { key: "Escape" })).toBe(true);
+    expect(box).not.toHaveFocus();
+    expect(box).toHaveValue("Draft");
+    expect(screen.getByRole("blockquote")).toHaveTextContent("Quoted");
+    expect(send).not.toHaveBeenCalled(); expect(clear).not.toHaveBeenCalled();
   });
 
   it("awaits sends before clearing, keeps rejected text, supports limits and exposes focus", async () => {
@@ -112,6 +128,17 @@ describe("rail components", () => {
     const first = screen.getByRole("button", { name: "First" }); const last = screen.getByRole("button", { name: "Last" });
     first.focus(); fireEvent.keyDown(document, { key: "Tab", shiftKey: true }); expect(document.activeElement).toBe(last);
     fireEvent.keyDown(document, { key: "Escape" }); expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open chat" })).toBeInTheDocument();
+  });
+
+  it("lets Escape from the composer close the narrow sheet", () => {
+    Object.defineProperty(window, "matchMedia", { writable: true, value: vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }) });
+    function Example() { const [open, setOpen] = useState(true); return <RailShell open={open} onOpenChange={setOpen}><Composer onSend={() => undefined} /></RailShell>; }
+    render(<Example />);
+    const box = screen.getByRole("textbox"); box.focus();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.keyDown(box, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open chat" })).toBeInTheDocument();
   });
 });
