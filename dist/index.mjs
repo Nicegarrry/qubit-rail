@@ -97,7 +97,9 @@ var Composer = forwardRef(function Composer2({ onSend, quote, onClearQuote, send
         disabled: blocked,
         onChange: (event) => setText(event.target.value),
         onKeyDown: (event) => {
-          if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+          if (event.key === "Escape") {
+            event.currentTarget.blur();
+          } else if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
             void submit();
           }
