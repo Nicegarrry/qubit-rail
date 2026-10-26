@@ -45,6 +45,22 @@ describe("rail components", () => {
     expect(screen.getByRole("textbox")).toBeDisabled(); expect(screen.getByRole("alert")).toHaveTextContent("No connection");
   });
 
+  it("blurs on Escape without changing the draft or quote and lets Escape bubble", () => {
+    const send = vi.fn(); const clear = vi.fn(); const keyDown = vi.fn();
+    render(<div onKeyDown={event => keyDown(event.key, event.defaultPrevented)}><Composer onSend={send} quote="Quoted" onClearQuote={clear} /></div>);
+    const box = screen.getByRole("textbox");
+    const draft = "  Unsent draft\nwith a new line  ";
+    box.focus(); expect(box).toHaveFocus();
+    fireEvent.change(box, { target: { value: draft } });
+    const unhandled = fireEvent.keyDown(box, { key: "Escape" });
+    expect(box).not.toHaveFocus();
+    expect(box).toHaveValue(draft);
+    expect(screen.getByRole("blockquote")).toHaveTextContent("Quoted");
+    expect(send).not.toHaveBeenCalled(); expect(clear).not.toHaveBeenCalled();
+    expect(keyDown).toHaveBeenCalledExactlyOnceWith("Escape", false);
+    expect(unhandled).toBe(true);
+  });
+
   it("awaits sends before clearing, keeps rejected text, supports limits and exposes focus", async () => {
     let resolve!: () => void;
     let reject!: (reason?: unknown) => void;
