@@ -31,7 +31,7 @@ describe("rail components", () => {
     expect(screen.getByRole("button", { name: "Wait" })).toBeDisabled();
   });
 
-  it("sends on Enter, keeps a newline on Shift+Enter, and respects busy state", async () => {
+  it("sends on Enter, ignores Shift+Enter and composing Enter, and respects busy state", async () => {
     const send = vi.fn(); const clear = vi.fn();
     const { rerender } = render(<Composer onSend={send} quote="Quoted" onClearQuote={clear} />);
     const box = screen.getByRole("textbox");
@@ -40,9 +40,24 @@ describe("rail components", () => {
     await waitFor(() => expect(box).not.toBeDisabled());
     fireEvent.change(box, { target: { value: "one" } }); fireEvent.keyDown(box, { key: "Enter", shiftKey: true });
     expect(send).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(box, { key: "Enter", isComposing: true });
+    expect(send).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Remove quote" })); expect(clear).toHaveBeenCalled();
     rerender(<Composer onSend={send} sending error="No connection" />);
     expect(screen.getByRole("textbox")).toBeDisabled(); expect(screen.getByRole("alert")).toHaveTextContent("No connection");
+  });
+
+  it("blurs on Escape without changing the draft or quote", () => {
+    const send = vi.fn(); const clear = vi.fn();
+    render(<Composer onSend={send} quote="Quoted" onClearQuote={clear} />);
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "Draft" } });
+    box.focus(); expect(box).toHaveFocus();
+    fireEvent.keyDown(box, { key: "Escape" });
+    expect(box).not.toHaveFocus();
+    expect(box).toHaveValue("Draft");
+    expect(screen.getByText("Quoted")).toBeInTheDocument();
+    expect(send).not.toHaveBeenCalled(); expect(clear).not.toHaveBeenCalled();
   });
 
   it("awaits sends before clearing, keeps rejected text, supports limits and exposes focus", async () => {
@@ -113,5 +128,16 @@ describe("rail components", () => {
     first.focus(); fireEvent.keyDown(document, { key: "Tab", shiftKey: true }); expect(document.activeElement).toBe(last);
     fireEvent.keyDown(document, { key: "Escape" }); expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open chat" })).toBeInTheDocument();
+  });
+
+  it("bubbles Composer Escape to close a narrow sheet", () => {
+    Object.defineProperty(window, "matchMedia", { writable: true, value: vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }) });
+    const close = vi.fn();
+    render(<RailShell open onOpenChange={close}><Composer onSend={() => undefined} /></RailShell>);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    const box = screen.getByRole("textbox");
+    box.focus(); expect(box).toHaveFocus();
+    fireEvent.keyDown(box, { key: "Escape" });
+    expect(close).toHaveBeenCalledWith(false);
   });
 });
