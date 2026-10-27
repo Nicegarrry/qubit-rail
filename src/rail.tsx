@@ -97,7 +97,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   return <form className="rail-composer" onSubmit={submit}>
     {quote && <div className="rail-quote-row"><blockquote className="rail-quote">{quote}</blockquote>{onClearQuote && <button type="button" className="rail-icon" aria-label="Remove quote" disabled={blocked} onClick={onClearQuote}>×</button>}</div>}
     <textarea ref={textarea} aria-label={placeholder} placeholder={placeholder} rows={3} maxLength={maxLength} value={text} disabled={blocked} onChange={event => setText(event.target.value)}
-      onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void submit(); } }} />
+      onKeyDown={event => { if (event.key === "Escape") event.currentTarget.blur(); if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void submit(); } }} />
     <div className="rail-composer-end"><span>{sending || submitting ? "Sending…" : "Enter to send · Shift+Enter for a new line"}</span><button type="submit" disabled={blocked || !text.trim()}>{sending || submitting ? "Sending…" : "Send"}</button></div>
     {error && <p className="rail-error" role="alert">{error}</p>}
   </form>;
