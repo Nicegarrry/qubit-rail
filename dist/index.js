@@ -1,7 +1,7 @@
 "use strict";Object.defineProperty(exports, "__esModule", {value: true});
 
-var _chunkKR5X3OFKjs = require('./chunk-KR5X3OFK.js');
+var _chunk3D4AT25Wjs = require('./chunk-3D4AT25W.js');
 
 
-exports.mount = _chunkKR5X3OFKjs.mount;
+exports.mount = _chunk3D4AT25Wjs.mount;
 //# sourceMappingURL=index.js.map

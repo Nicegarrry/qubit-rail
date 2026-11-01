@@ -35,3 +35,7 @@ The embed owns sign-in UI; the host controls whether the bubble is rendered. The
 ## Position
 
 The bubble sits 24px from the bottom-right corner. To lift it above a host control, set CSS variables on the element: `qubit-rail-bubble { --qubit-rail-bottom: 88px; --qubit-rail-right: 24px; }`. The panel follows.
+
+## Sign-in
+
+Pass `auth` (a function returning the host's Clerk session token) so people who are already signed in on the host never see a second sign-in in the chat. The bubble sends `{ type: "auth", token }` to the embed when it posts `ready`, `signed-out` or `auth-request`. The embed verifies the token with Clerk and starts its own session. Without `auth`, the embed falls back to its own sign-in button.

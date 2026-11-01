@@ -63,6 +63,15 @@ function mount(options = {}, target = document.body) {
     const data = event.data;
     if (!data || data.source !== "qubit-rail" || data.v !== 1) return;
     if (data.type === "ready" && isOpen) send("opened");
+    if ((data.type === "ready" || data.type === "signed-out" || data.type === "auth-request") && options.auth) {
+      let token;
+      try {
+        token = await options.auth();
+      } catch {
+        token = void 0;
+      }
+      if (!destroyed && typeof token === "string" && token) send("auth", { token });
+    }
     if (data.type === "close") close();
     if (data.type === "unread") dot.hidden = isOpen || !(data.count > 0);
     if (data.type === "context-request") {
@@ -109,4 +118,4 @@ function mount(options = {}, target = document.body) {
 export {
   mount
 };
-//# sourceMappingURL=chunk-HNFXFDCA.mjs.map
+//# sourceMappingURL=chunk-OC57BTSE.mjs.map
