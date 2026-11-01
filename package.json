@@ -1,9 +1,9 @@
 {
   "name": "@qubit/rail",
-  "version": "0.1.1",
-  "description": "Presentational React chat rail for qWork and qubit-site",
+  "version": "1.0.0",
+  "description": "A floating QOS embedded chat bubble",
   "license": "MIT",
-  "sideEffects": ["./dist/index.css"],
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -13,9 +13,16 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
-    "./style.css": "./dist/index.css"
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.mjs",
+      "require": "./dist/react.js"
+    }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
@@ -39,5 +46,13 @@
     "typescript": "^5.9.3",
     "vite": "^7.2.2",
     "vitest": "^4.0.8"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   }
 }
