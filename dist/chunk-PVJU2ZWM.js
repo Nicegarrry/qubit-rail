@@ -1,4 +1,4 @@
-// src/index.ts
+"use strict";Object.defineProperty(exports, "__esModule", {value: true}); function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } } async function _asyncNullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return await rhsFn(); } } function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }// src/index.ts
 var mounted;
 var chatIcon = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 0 1-.923 1.785A5.969 5.969 0 0 0 6 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337Z" />';
 var closeIcon = '<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />';
@@ -15,7 +15,7 @@ iframe { display: block; width: 100%; height: 100%; border: 0; }
 `;
 function mount(options = {}, target = document.body) {
   if (mounted) return mounted;
-  const origin = options.origin ?? "https://qos.qubitstudio.app";
+  const origin = _nullishCoalesce(options.origin, () => ( "https://qos.qubitstudio.app"));
   const expectedOrigin = new URL(origin).origin;
   const host = document.createElement("qubit-rail-bubble");
   const shadow = host.attachShadow({ mode: "open" });
@@ -24,17 +24,17 @@ function mount(options = {}, target = document.body) {
   const svg = shadow.querySelector("svg");
   const dot = shadow.querySelector(".dot");
   const panel = shadow.querySelector(".panel");
-  button.setAttribute("aria-label", options.label ?? "Chat with QOS");
+  button.setAttribute("aria-label", _nullishCoalesce(options.label, () => ( "Chat with QOS")));
   button.setAttribute("aria-expanded", "false");
   let iframe;
   let isOpen = false;
   let destroyed = false;
-  const send = (type, fields = {}) => iframe?.contentWindow?.postMessage({ source: "qubit-rail", v: 1, type, ...fields }, origin);
+  const send = (type, fields = {}) => _optionalChain([iframe, 'optionalAccess', _ => _.contentWindow, 'optionalAccess', _2 => _2.postMessage, 'call', _3 => _3({ source: "qubit-rail", v: 1, type, ...fields }, expectedOrigin)]);
   const open = () => {
     if (destroyed || isOpen) return;
     if (!iframe) {
       iframe = document.createElement("iframe");
-      iframe.src = `${origin.replace(/\/$/, "")}/embed?agent=${options.agent ?? "qos"}`;
+      iframe.src = `${origin.replace(/\/$/, "")}/embed?agent=${_nullishCoalesce(options.agent, () => ( "qos"))}`;
       iframe.title = "QOS chat";
       iframe.allow = "clipboard-write";
       panel.append(iframe);
@@ -55,10 +55,11 @@ function mount(options = {}, target = document.body) {
     panel.hidden = true;
     svg.innerHTML = chatIcon;
     button.setAttribute("aria-expanded", "false");
+    send("closed");
     button.focus();
   };
   const onMessage = async (event) => {
-    if (!iframe?.contentWindow || event.origin !== expectedOrigin || event.source !== iframe.contentWindow) return;
+    if (!_optionalChain([iframe, 'optionalAccess', _4 => _4.contentWindow]) || event.origin !== expectedOrigin || event.source !== iframe.contentWindow) return;
     const data = event.data;
     if (!data || data.source !== "qubit-rail" || data.v !== 1) return;
     if (data.type === "ready" && isOpen) send("opened");
@@ -68,9 +69,10 @@ function mount(options = {}, target = document.body) {
       const defaults = { url: location.href, title: document.title, kind: "site-page" };
       let context = defaults;
       try {
-        context = { ...defaults, ...await options.context?.() };
+        const given = await _asyncNullishCoalesce(await _optionalChain([options, 'access', _5 => _5.context, 'optionalCall', _6 => _6()]), async () => ( {}));
+        context = { ...defaults, ...Object.fromEntries(Object.entries(given).filter(([, value]) => value !== void 0)) };
         if (context.selection !== void 0) context.selection = context.selection.slice(0, 4e3);
-      } catch {
+      } catch (e) {
         context = defaults;
       }
       if (!destroyed) send("context", { id: data.id, context });
@@ -104,7 +106,7 @@ function mount(options = {}, target = document.body) {
   return handle;
 }
 
-export {
-  mount
-};
-//# sourceMappingURL=chunk-FHVGAYXQ.mjs.map
+
+
+exports.mount = mount;
+//# sourceMappingURL=chunk-PVJU2ZWM.js.map

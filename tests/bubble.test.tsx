@@ -53,6 +53,18 @@ describe("bubble", () => {
     message("context-request", { id: "a" });
     await waitFor(() => expect(post).toHaveBeenCalledWith({ source: "qubit-rail", v: 1, type: "context", id: "a", context: { url: location.href, title: document.title, kind: "wiki-page", selection: "x".repeat(4000) } }, origin));
   });
+  it("tells the embed when the panel closes", () => {
+    handle = mount({ origin }); handle.open();
+    const post = mockWindow();
+    handle.close();
+    expect(post).toHaveBeenCalledWith({ source: "qubit-rail", v: 1, type: "closed" }, origin);
+  });
+  it("keeps defaults for context keys given as undefined", async () => {
+    handle = mount({ origin, context: () => ({ url: undefined, kind: "qwork-doc", id: "f1" }) }); handle.open();
+    const post = mockWindow();
+    message("context-request", { id: "u" });
+    await waitFor(() => expect(post).toHaveBeenCalledWith({ source: "qubit-rail", v: 1, type: "context", id: "u", context: { url: location.href, title: document.title, kind: "qwork-doc", id: "f1" } }, origin));
+  });
   it("uses defaults when context throws", async () => {
     handle = mount({ origin, context: () => { throw new Error("oops"); } }); handle.open();
     const post = mockWindow();

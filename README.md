@@ -28,6 +28,6 @@ Both accept `agent` (defaults to `"qos"`), `origin` (defaults to `https://qos.qu
 The iframe loads `/embed?agent=qos` on the configured origin. All messages are objects with `source: "qubit-rail"`, `v: 1`, and `type`. Only messages from the configured origin and the iframe window are accepted; replies use that origin as their target.
 
 - Embed → host: `ready`, `context-request` with `id`, `unread` with `count`, `close`, and `signed-out`.
-- Host → embed: `opened` on each open and in reply to `ready` while open; `context` with the request `id` and merged `context` in reply to `context-request`. If the callback fails, the defaults are sent.
+- Host → embed: `opened` on each open and in reply to `ready` while open; `context` with the request `id` and merged `context` in reply to `context-request`. If the callback fails, the defaults are sent. `closed` is sent each time the panel closes.
 
 The embed owns sign-in UI; the host controls whether the bubble is rendered. The iframe is created on first open and retained until destruction.

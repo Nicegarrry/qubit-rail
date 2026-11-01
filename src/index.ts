@@ -32,7 +32,7 @@ export function mount(options: BubbleOptions = {}, target: HTMLElement = documen
   let iframe: HTMLIFrameElement | undefined;
   let isOpen = false;
   let destroyed = false;
-  const send = (type: string, fields: Record<string, unknown> = {}) => iframe?.contentWindow?.postMessage({ source: "qubit-rail", v: 1, type, ...fields }, origin);
+  const send = (type: string, fields: Record<string, unknown> = {}) => iframe?.contentWindow?.postMessage({ source: "qubit-rail", v: 1, type, ...fields }, expectedOrigin);
   const open = () => {
     if (destroyed || isOpen) return;
     if (!iframe) {
@@ -58,6 +58,7 @@ export function mount(options: BubbleOptions = {}, target: HTMLElement = documen
     panel.hidden = true;
     svg.innerHTML = chatIcon;
     button.setAttribute("aria-expanded", "false");
+    send("closed");
     button.focus();
   };
   const onMessage = async (event: MessageEvent) => {
@@ -71,7 +72,8 @@ export function mount(options: BubbleOptions = {}, target: HTMLElement = documen
       const defaults: PageContext = { url: location.href, title: document.title, kind: "site-page" };
       let context = defaults;
       try {
-        context = { ...defaults, ...await options.context?.() };
+        const given = (await options.context?.()) ?? {};
+        context = { ...defaults, ...Object.fromEntries(Object.entries(given).filter(([, value]) => value !== undefined)) };
         if (context.selection !== undefined) context.selection = context.selection.slice(0, 4000);
       } catch { context = defaults; }
       if (!destroyed) send("context", { id: data.id, context });
