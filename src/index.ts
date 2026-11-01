@@ -1,5 +1,103 @@
-import "./rail.css";
+export type PageContext = { url: string; title: string; kind: "wiki-page" | "qwork-doc" | "qwork-deck" | "site-page"; id?: string; selection?: string; extra?: Record<string, string> };
+export type BubbleOptions = { agent?: "qos"; origin?: string; context?: () => Partial<PageContext> | Promise<Partial<PageContext>>; label?: string };
+export type BubbleHandle = { open(): void; close(): void; toggle(): void; destroy(): void; readonly isOpen: boolean };
 
-export { AwayNotice, Composer, MessageList, RailHeader, RailShell, ThreadList, ThreadSwitcher, UnreadBadge } from "./rail";
-export type { MarkdownRenderer, RailMessage, RailQuickReply, RailThread } from "./types";
-export type { ComposerHandle, ComposerProps } from "./rail";
+let mounted: BubbleHandle | undefined;
+const chatIcon = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 0 1-.923 1.785A5.969 5.969 0 0 0 6 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337Z" />';
+const closeIcon = '<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />';
+const css = `
+:host { all: initial; }
+*, *::before, *::after { box-sizing: border-box; }
+button { position: fixed; right: 24px; bottom: 24px; width: 56px; height: 56px; border: 0; border-radius: 50%; background: #111; color: white; display: grid; place-items: center; cursor: pointer; z-index: 2147483647; }
+button svg { width: 24px; height: 24px; }
+.dot { position: absolute; top: 3px; right: 3px; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; background: #ed493d; }
+[hidden] { display: none !important; }
+.panel { position: fixed; right: 24px; bottom: 96px; width: 400px; height: min(640px, 100vh - 112px); border-radius: 16px; overflow: hidden; background: white; box-shadow: 0 12px 40px rgba(0,0,0,.2); z-index: 2147483646; }
+iframe { display: block; width: 100%; height: 100%; border: 0; }
+@media (max-width: 639px) { .panel { inset: 0; width: 100%; height: 100%; border-radius: 0; } :host([open]) button { display: none; } }
+`;
+export function mount(options: BubbleOptions = {}, target: HTMLElement = document.body): BubbleHandle {
+  if (mounted) return mounted;
+  const origin = options.origin ?? "https://qos.qubitstudio.app";
+  const expectedOrigin = new URL(origin).origin;
+  const host = document.createElement("qubit-rail-bubble");
+  const shadow = host.attachShadow({ mode: "open" });
+  shadow.innerHTML = `<style>${css}</style><div class="panel" hidden></div><button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${chatIcon}</svg><span class="dot" hidden></span></button>`;
+  const button = shadow.querySelector("button")!;
+  const svg = shadow.querySelector("svg")!;
+  const dot = shadow.querySelector<HTMLElement>(".dot")!;
+  const panel = shadow.querySelector<HTMLElement>(".panel")!;
+  button.setAttribute("aria-label", options.label ?? "Chat with QOS");
+  button.setAttribute("aria-expanded", "false");
+  let iframe: HTMLIFrameElement | undefined;
+  let isOpen = false;
+  let destroyed = false;
+  const send = (type: string, fields: Record<string, unknown> = {}) => iframe?.contentWindow?.postMessage({ source: "qubit-rail", v: 1, type, ...fields }, expectedOrigin);
+  const open = () => {
+    if (destroyed || isOpen) return;
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.src = `${origin.replace(/\/$/, "")}/embed?agent=${options.agent ?? "qos"}`;
+      iframe.title = "QOS chat";
+      iframe.allow = "clipboard-write";
+      panel.append(iframe);
+    }
+    isOpen = true;
+    host.setAttribute("open", "");
+    panel.hidden = false;
+    dot.hidden = true;
+    svg.innerHTML = closeIcon;
+    button.setAttribute("aria-expanded", "true");
+    send("opened");
+    iframe.focus();
+  };
+  const close = () => {
+    if (destroyed || !isOpen) return;
+    isOpen = false;
+    host.removeAttribute("open");
+    panel.hidden = true;
+    svg.innerHTML = chatIcon;
+    button.setAttribute("aria-expanded", "false");
+    send("closed");
+    button.focus();
+  };
+  const onMessage = async (event: MessageEvent) => {
+    if (!iframe?.contentWindow || event.origin !== expectedOrigin || event.source !== iframe.contentWindow) return;
+    const data = event.data;
+    if (!data || data.source !== "qubit-rail" || data.v !== 1) return;
+    if (data.type === "ready" && isOpen) send("opened");
+    if (data.type === "close") close();
+    if (data.type === "unread") dot.hidden = isOpen || !(data.count > 0);
+    if (data.type === "context-request") {
+      const defaults: PageContext = { url: location.href, title: document.title, kind: "site-page" };
+      let context = defaults;
+      try {
+        const given = (await options.context?.()) ?? {};
+        context = { ...defaults, ...Object.fromEntries(Object.entries(given).filter(([, value]) => value !== undefined)) };
+        if (context.selection !== undefined) context.selection = context.selection.slice(0, 4000);
+      } catch { context = defaults; }
+      if (!destroyed) send("context", { id: data.id, context });
+    }
+  };
+  const onKeydown = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
+  const handle: BubbleHandle = {
+    open, close,
+    toggle: () => isOpen ? close() : open(),
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      isOpen = false;
+      window.removeEventListener("message", onMessage);
+      document.removeEventListener("keydown", onKeydown);
+      host.remove();
+      if (mounted === handle) mounted = undefined;
+    },
+    get isOpen() { return isOpen; },
+  };
+  button.addEventListener("click", handle.toggle);
+  window.addEventListener("message", onMessage);
+  document.addEventListener("keydown", onKeydown);
+  target.append(host);
+  mounted = handle;
+  return handle;
+}
