@@ -65,6 +65,26 @@ describe("bubble", () => {
     message("context-request", { id: "u" });
     await waitFor(() => expect(post).toHaveBeenCalledWith({ source: "qubit-rail", v: 1, type: "context", id: "u", context: { url: location.href, title: document.title, kind: "qwork-doc", id: "f1" } }, origin));
   });
+  it("hands the host's sign-in token to the embed on ready, signed-out and auth-request", async () => {
+    let n = 0;
+    handle = mount({ origin, auth: async () => `tok${++n}` }); handle.open();
+    const post = mockWindow();
+    message("ready");
+    await waitFor(() => expect(post).toHaveBeenCalledWith({ source: "qubit-rail", v: 1, type: "auth", token: "tok1" }, origin));
+    message("signed-out");
+    await waitFor(() => expect(post).toHaveBeenCalledWith({ source: "qubit-rail", v: 1, type: "auth", token: "tok2" }, origin));
+    message("auth-request", {}, "https://wrong.example");
+    message("auth-request");
+    await waitFor(() => expect(post).toHaveBeenCalledWith({ source: "qubit-rail", v: 1, type: "auth", token: "tok3" }, origin));
+    expect(n).toBe(3);
+  });
+  it("sends no auth message without a token", async () => {
+    handle = mount({ origin, auth: () => null }); handle.open();
+    const post = mockWindow();
+    message("signed-out");
+    await new Promise(r => setTimeout(r, 0));
+    expect(post.mock.calls.some(([m]) => m.type === "auth")).toBe(false);
+  });
   it("uses defaults when context throws", async () => {
     handle = mount({ origin, context: () => { throw new Error("oops"); } }); handle.open();
     const post = mockWindow();

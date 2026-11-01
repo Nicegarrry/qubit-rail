@@ -63,6 +63,15 @@ function mount(options = {}, target = document.body) {
     const data = event.data;
     if (!data || data.source !== "qubit-rail" || data.v !== 1) return;
     if (data.type === "ready" && isOpen) send("opened");
+    if ((data.type === "ready" || data.type === "signed-out" || data.type === "auth-request") && options.auth) {
+      let token;
+      try {
+        token = await options.auth();
+      } catch (e) {
+        token = void 0;
+      }
+      if (!destroyed && typeof token === "string" && token) send("auth", { token });
+    }
     if (data.type === "close") close();
     if (data.type === "unread") dot.hidden = isOpen || !(data.count > 0);
     if (data.type === "context-request") {
@@ -72,7 +81,7 @@ function mount(options = {}, target = document.body) {
         const given = await _asyncNullishCoalesce(await _optionalChain([options, 'access', _5 => _5.context, 'optionalCall', _6 => _6()]), async () => ( {}));
         context = { ...defaults, ...Object.fromEntries(Object.entries(given).filter(([, value]) => value !== void 0)) };
         if (context.selection !== void 0) context.selection = context.selection.slice(0, 4e3);
-      } catch (e) {
+      } catch (e2) {
         context = defaults;
       }
       if (!destroyed) send("context", { id: data.id, context });
@@ -109,4 +118,4 @@ function mount(options = {}, target = document.body) {
 
 
 exports.mount = mount;
-//# sourceMappingURL=chunk-KR5X3OFK.js.map
+//# sourceMappingURL=chunk-3D4AT25W.js.map

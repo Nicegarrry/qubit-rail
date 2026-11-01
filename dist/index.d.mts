@@ -11,6 +11,7 @@ type BubbleOptions = {
     origin?: string;
     context?: () => Partial<PageContext> | Promise<Partial<PageContext>>;
     label?: string;
+    auth?: () => string | null | undefined | Promise<string | null | undefined>;
 };
 type BubbleHandle = {
     open(): void;

@@ -1,5 +1,5 @@
 export type PageContext = { url: string; title: string; kind: "wiki-page" | "qwork-doc" | "qwork-deck" | "site-page"; id?: string; selection?: string; extra?: Record<string, string> };
-export type BubbleOptions = { agent?: "qos"; origin?: string; context?: () => Partial<PageContext> | Promise<Partial<PageContext>>; label?: string };
+export type BubbleOptions = { agent?: "qos"; origin?: string; context?: () => Partial<PageContext> | Promise<Partial<PageContext>>; label?: string; auth?: () => string | null | undefined | Promise<string | null | undefined> };
 export type BubbleHandle = { open(): void; close(): void; toggle(): void; destroy(): void; readonly isOpen: boolean };
 
 let mounted: BubbleHandle | undefined;
@@ -66,6 +66,11 @@ export function mount(options: BubbleOptions = {}, target: HTMLElement = documen
     const data = event.data;
     if (!data || data.source !== "qubit-rail" || data.v !== 1) return;
     if (data.type === "ready" && isOpen) send("opened");
+    if ((data.type === "ready" || data.type === "signed-out" || data.type === "auth-request") && options.auth) {
+      let token: string | null | undefined;
+      try { token = await options.auth(); } catch { token = undefined; }
+      if (!destroyed && typeof token === "string" && token) send("auth", { token });
+    }
     if (data.type === "close") close();
     if (data.type === "unread") dot.hidden = isOpen || !(data.count > 0);
     if (data.type === "context-request") {
