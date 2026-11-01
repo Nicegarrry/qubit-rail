@@ -31,3 +31,7 @@ The iframe loads `/embed?agent=qos` on the configured origin. All messages are o
 - Host → embed: `opened` on each open and in reply to `ready` while open; `context` with the request `id` and merged `context` in reply to `context-request`. If the callback fails, the defaults are sent. `closed` is sent each time the panel closes.
 
 The embed owns sign-in UI; the host controls whether the bubble is rendered. The iframe is created on first open and retained until destruction.
+
+## Position
+
+The bubble sits 24px from the bottom-right corner. To lift it above a host control, set CSS variables on the element: `qubit-rail-bubble { --qubit-rail-bottom: 88px; --qubit-rail-right: 24px; }`. The panel follows.

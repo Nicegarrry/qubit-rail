@@ -8,11 +8,11 @@ const closeIcon = '<path stroke-linecap="round" stroke-linejoin="round" d="M6 18
 const css = `
 :host { all: initial; }
 *, *::before, *::after { box-sizing: border-box; }
-button { position: fixed; right: 24px; bottom: 24px; width: 56px; height: 56px; border: 0; border-radius: 50%; background: #111; color: white; display: grid; place-items: center; cursor: pointer; z-index: 2147483647; }
+button { position: fixed; right: var(--qubit-rail-right, 24px); bottom: var(--qubit-rail-bottom, 24px); width: 56px; height: 56px; border: 0; border-radius: 50%; background: #111; color: white; display: grid; place-items: center; cursor: pointer; z-index: 2147483647; }
 button svg { width: 24px; height: 24px; }
 .dot { position: absolute; top: 3px; right: 3px; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; background: #ed493d; }
 [hidden] { display: none !important; }
-.panel { position: fixed; right: 24px; bottom: 96px; width: 400px; height: min(640px, 100vh - 112px); border-radius: 16px; overflow: hidden; background: white; box-shadow: 0 12px 40px rgba(0,0,0,.2); z-index: 2147483646; }
+.panel { position: fixed; right: var(--qubit-rail-right, 24px); bottom: calc(var(--qubit-rail-bottom, 24px) + 72px); width: 400px; height: min(640px, 100vh - 112px); border-radius: 16px; overflow: hidden; background: white; box-shadow: 0 12px 40px rgba(0,0,0,.2); z-index: 2147483646; }
 iframe { display: block; width: 100%; height: 100%; border: 0; }
 @media (max-width: 639px) { .panel { inset: 0; width: 100%; height: 100%; border-radius: 0; } :host([open]) button { display: none; } }
 `;
